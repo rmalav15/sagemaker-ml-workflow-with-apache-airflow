@@ -5,7 +5,7 @@ config = {}
 
 config["job_level"] = {
     "region_name": "<region-name>",
-    "run_hyperparameter_opt": "no"
+    "run_hyperparameter_opt": "yes"
 }
 
 config["preprocess_data"] = {
