@@ -18,6 +18,9 @@ from airflow.contrib.operators.sagemaker_tuning_operator \
     import SageMakerTuningOperator
 from airflow.contrib.operators.sagemaker_transform_operator \
     import SageMakerTransformOperator
+from airflow.contrib.operators.sagemaker_endpoint_operator \
+    import SageMakerEndpointOperator
+
 from airflow.contrib.hooks.aws_hook import AwsHook
 
 # sagemaker sdk
@@ -27,10 +30,12 @@ from sagemaker.amazon.amazon_estimator import get_image_uri
 from sagemaker.estimator import Estimator
 from sagemaker.tuner import HyperparameterTuner
 
+
 # airflow sagemaker configuration
 from sagemaker.workflow.airflow import training_config
 from sagemaker.workflow.airflow import tuning_config
 from sagemaker.workflow.airflow import transform_config_from_estimator
+from sagemaker.workflow.airflow import deploy_config_from_estimator
 
 # ml workflow specific
 from pipeline import prepare, preprocess
@@ -108,6 +113,13 @@ transform_config = transform_config_from_estimator(
     **config["batch_transform"]["transform_config"]
 )
 
+deploy_endpoint_config = deploy_config_from_estimator(
+    estimator=fm_estimator,
+    task_id="model_tuning" if hpo_enabled else "model_training",
+    task_type="tuning" if hpo_enabled else "training",
+    **config["deploy_endpoint"]
+)
+
 # =============================================================================
 # define airflow DAG and tasks
 # =============================================================================
@@ -120,7 +132,7 @@ args = {
 }
 
 dag = DAG(
-    dag_id='sagemaker-ml-pipeline-hpo',
+    dag_id='sagemaker-ml-pipeline-ene',
     default_args=args,
     schedule_interval=None,
     concurrency=1,
@@ -189,6 +201,16 @@ batch_transform_task = SageMakerTransformOperator(
     trigger_rule=TriggerRule.ONE_SUCCESS
 )
 
+# Deploy Endpoint
+deploy_model_task = SageMakerEndpointOperator(
+    task_id='deployment',
+    dag=dag,
+    config=deploy_endpoint_config,
+    aws_conn_id='airflow-sagemaker',
+    wait_for_completion=True,
+    check_interval=30
+)
+
 cleanup_task = DummyOperator(
     task_id='cleaning_up',
     dag=dag)
@@ -202,4 +224,5 @@ branching.set_downstream(tune_model_task)
 branching.set_downstream(train_model_task)
 tune_model_task.set_downstream(batch_transform_task)
 train_model_task.set_downstream(batch_transform_task)
-batch_transform_task.set_downstream(cleanup_task)
+batch_transform_task.set_downstream(deploy_model_task)
+deploy_model_task.set_downstream(cleanup_task)

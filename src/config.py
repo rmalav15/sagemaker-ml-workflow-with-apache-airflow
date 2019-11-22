@@ -5,7 +5,7 @@ config = {}
 
 config["job_level"] = {
     "region_name": "<region-name>",
-    "run_hyperparameter_opt": "yes"
+    "run_hyperparameter_opt": "no"
 }
 
 config["preprocess_data"] = {
@@ -73,4 +73,9 @@ config["batch_transform"] = {
         "strategy": "MultiRecord",
         "output_path": "s3://<s3-bucket>/transform/"
     }
+}
+
+config["deploy_endpoint"] = {
+        "initial_instance_count": 1,
+        "instance_type": "ml.c4.xlarge"
 }
